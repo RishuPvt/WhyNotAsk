@@ -20,5 +20,9 @@ import UserRouter from "../src/Routes/User.Routes.js"
 
 app.use("/api/v1/users", UserRouter);
 
+// Importing Tweet routes from the "Tweet.routes.js" file
+import TweetRouter from "../src/Routes/Tweet.Routes.js"
+
+app.use("/api/v1/Tweets" , TweetRouter)
 
 export {app}
