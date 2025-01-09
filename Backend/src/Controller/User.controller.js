@@ -1,7 +1,7 @@
 import { ApiError } from "../Utlis/ApiError.js";
 import { ApiResponse } from "../Utlis/ApiResponse.js";
 import { asyncHandler } from "../Utlis/Asynchandler.js";
-import { uploadOnCloudinary } from "../Utlis/Clodinary.js";
+import { uploadOnCloudinary, deleteOnCloudinary } from "../Utlis/Clodinary.js";
 import prisma from "../DB/DataBase.js";
 import bcrypt from "bcrypt";
 
@@ -62,6 +62,23 @@ const loginUser = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Invalid user password");
   }
 
+  const accessToken = jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      fullName: user.fullName,
+    },
+    process.env.ACCESS_TOKEN_SECRET,
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user.id },
+    process.env.REFRESH_TOKEN_SECRET,
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY }
+  );
+
   const options = {
     httpOnly: true,
     secure: true,
@@ -69,21 +86,220 @@ const loginUser = asyncHandler(async (req, res) => {
   };
   return res
     .status(200)
-    .cookie("accessToken",options)
-    .cookie("refreshToken",options)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(
       new ApiResponse(200, "User logged In Successfully", {
         id: user.id,
         username: user.username,
         email: user.email,
         fullName: user.fullName,
+        bio: user.bio,
       })
     );
 });
 
 const logoutUser = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
 
-  
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+    await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        refreshToken: null,
+      },
+    });
+
+    const options = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "strict",
+    };
+
+    return res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(
+        new ApiResponse(200, "User logged out successfully", {
+          id: user.id,
+          email: user.email,
+        })
+      );
+  } catch (error) {
+    throw new ApiError(500, "Error while logging out user");
+  }
 });
 
-export { RegisterUser, loginUser, logoutUser };
+const getCurrentUser = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+    if (!user) {
+      throw new ApiError(404, "user not found");
+    }
+
+    return res
+      .status()
+      .json(new ApiResponse(200, user, "user fetched succesfully"));
+  } catch (error) {
+    return res
+      .status(400)
+      .json(new ApiError(400, "somthing went wrong while fetching user"));
+  }
+});
+
+const getUserbyId = asyncHandler(async (req, res) => {
+  const {userId} = req.params;
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  const avatarUrl = user.avatar ? user.avatar.url : null;
+
+  return res.status(200).json(
+    new ApiResponse(200, "User fetched Successfully", {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName,
+      bio: user.bio,
+      avatar: avatarUrl,
+    })
+  );
+});
+
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  const userId = req.user.id;
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+  if (!user) {
+    throw new ApiError(404, "user not found");
+  }
+  const isPasswordCorrect = await bcrypt.compare(oldPassword, user.password);
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Wrong user password");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      password: hashedPassword,
+    },
+  });
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "password updated succesfully"));
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { username, email, bio } = req.body;
+  const userId = req.user.id;
+  if (!(username || email || bio)) {
+    throw new ApiError(400, "At least one field is required");
+  }
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+  if (!user) {
+    throw new ApiError(404, "user not found");
+  }
+
+  const updateFields = {};
+  if (username) updateFields.username = username;
+  if (email) updateFields.email = email;
+  if (bio) updateFields.bio = bio;
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: updateFields,
+  });
+
+  return res
+    .status(200)
+    .json(
+      new ApiResponse(200, updatedUser, "Account details updated successfully")
+    );
+});
+
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  const userId = req.user.id;
+  if (!avatarLocalPath) {
+    throw new ApiError(400, "avatar file is missing");
+  }
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+  if (!user) {
+    throw new ApiError(404, "user not found");
+  }
+  if (user.avatar) {
+    const publicId = user.avatar.split("/").pop().split(".")[0];
+    await deleteOnCloudinary(publicId);
+  }
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading avatar");
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      avatar: avatar.url,
+    },
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
+});
+
+
+export {
+  RegisterUser,
+  loginUser,
+  logoutUser,
+  getCurrentUser,
+  changeCurrentPassword,
+  updateAccountDetails,
+  updateUserAvatar,
+  getUserbyId
+};
