@@ -13,43 +13,42 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
-  id           Int       @id @default(autoincrement())
-  username     String    @unique
+  id           Int        @id @default(autoincrement())
+  username     String     @unique
   fullName     String
-  email        String    @unique
+  email        String     @unique
   password     String
   bio          String?
   refreshToken String?
-  avatar       String?   // URL to profile picture
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  avatar       String? // URL to profile picture
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
   questions    Question[] @relation("UserQuestions")
   answers      Answer[]   @relation("UserAnswers")
 }
 
 model Question {
-  id          Int        @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   description String
   tags        String[]
   ownerId     Int
-  owner       User       @relation("UserQuestions", fields: [ownerId], references: [id])
-  answers     Answer[]   @relation("QuestionAnswers")
+  owner       User     @relation("UserQuestions", fields: [ownerId], references: [id])
+  answers     Answer[] @relation("QuestionAnswers")
   media       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Answer {
-  id          Int        @id @default(autoincrement())
-  content     String
-  questionId  Int
-  question    Question   @relation("QuestionAnswers", fields: [questionId], references: [id])
-  ownerId     Int
-  owner       User       @relation("UserAnswers", fields: [ownerId], references: [id])
-  media       String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id         Int      @id @default(autoincrement())
+  content    String
+  questionId Int
+  question   Question @relation("QuestionAnswers", fields: [questionId], references: [id])
+  ownerId    Int
+  owner      User     @relation("UserAnswers", fields: [ownerId], references: [id])
+  media      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
