@@ -4,6 +4,7 @@ import { asyncHandler } from "../Utlis/Asynchandler.js";
 import { uploadOnCloudinary, deleteOnCloudinary } from "../Utlis/Clodinary.js";
 import prisma from "../DB/DataBase.js";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const RegisterUser = asyncHandler(async (req, res) => {
   const { username, fullName, email, password, bio } = req.body;
@@ -142,7 +143,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 });
 
 const getCurrentUser = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user?.id;
+
   try {
     const user = await prisma.user.findUnique({
       where: {
@@ -154,7 +156,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     }
 
     return res
-      .status()
+      .status(200)
       .json(new ApiResponse(200, user, "user fetched succesfully"));
   } catch (error) {
     return res
@@ -164,7 +166,12 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 });
 
 const getUserbyId = asyncHandler(async (req, res) => {
-  const {userId} = req.params;
+  const userId = parseInt(req.params.userId, 10); //The second argument 10 specifies the base (decimal).
+
+  if (isNaN(userId)) {
+    throw new ApiError(400, "Invalid user ID format");
+  }
+
   const user = await prisma.user.findUnique({
     where: {
       id: userId,
@@ -175,7 +182,7 @@ const getUserbyId = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
 
-  const avatarUrl = user.avatar ? user.avatar.url : null;
+  const avatarUrl = user.avatar ? user.avatar : null;
 
   return res.status(200).json(
     new ApiResponse(200, "User fetched Successfully", {
@@ -184,7 +191,7 @@ const getUserbyId = asyncHandler(async (req, res) => {
       email: user.email,
       fullName: user.fullName,
       bio: user.bio,
-      avatar: avatarUrl,
+      avatar: avatarUrl || null,
     })
   );
 });
@@ -224,7 +231,9 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
   const { username, email, bio } = req.body;
-  const userId = req.user.id;
+
+  const userId = req.user?.id;
+
   if (!(username || email || bio)) {
     throw new ApiError(400, "At least one field is required");
   }
@@ -258,40 +267,43 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
   const avatarLocalPath = req.file?.path;
-  const userId = req.user.id;
-  if (!avatarLocalPath) {
-    throw new ApiError(400, "avatar file is missing");
-  }
-  const user = await prisma.user.findUnique({
-    where: {
-      id: userId,
-    },
-  });
-  if (!user) {
-    throw new ApiError(404, "user not found");
-  }
-  if (user.avatar) {
-    const publicId = user.avatar.split("/").pop().split(".")[0];
-    await deleteOnCloudinary(publicId);
-  }
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
-  if (!avatar.url) {
-    throw new ApiError(400, "Error while uploading avatar");
-  }
+  const userId = req.user?.id;
+  try {
+    if (!avatarLocalPath) {
+      throw new ApiError(400, "avatar file is missing");
+    }
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+    });
+    if (!user) {
+      throw new ApiError(404, "user not found");
+    }
+    if (user.avatar) {
+      const publicId = user.avatar.split("/").pop().split(".")[0];
+      await deleteOnCloudinary(publicId);
+    }
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+    if (!avatar.url) {
+      throw new ApiError(400, "Error while uploading avatar");
+    }
 
-  const updatedUser = await prisma.user.update({
-    where: {
-      id: userId,
-    },
-    data: {
-      avatar: avatar.url,
-    },
-  });
-  return res
-    .status(200)
-    .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        avatar: avatar.url,
+      },
+    });
+    return res
+      .status(200)
+      .json(new ApiResponse(200, updatedUser, "Avatar updated successfully"));
+  } catch (error) {
+    throw new ApiError(400, "somthing went wrong while changing avatar");
+  }
 });
-
 
 export {
   RegisterUser,
@@ -301,5 +313,5 @@ export {
   changeCurrentPassword,
   updateAccountDetails,
   updateUserAvatar,
-  getUserbyId
+  getUserbyId,
 };
