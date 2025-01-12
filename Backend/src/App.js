@@ -25,4 +25,10 @@ import TweetRouter from "../src/Routes/Tweet.Routes.js"
 
 app.use("/api/v1/Tweets" , TweetRouter)
 
+// Importing Comment routes from the "Tweet.routes.js" file
+import CommentRouter from "./Routes/Comment.Routes.js";
+
+app.use("/api/v1/comments" , CommentRouter)
+
+
 export {app}
