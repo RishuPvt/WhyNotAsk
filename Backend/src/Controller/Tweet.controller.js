@@ -1,21 +1,23 @@
 import { ApiError } from "../Utlis/ApiError.js";
 import { ApiResponse } from "../Utlis/ApiResponse.js";
 import { asyncHandler } from "../Utlis/Asynchandler.js";
-import { uploadOnCloudinary, deleteOnCloudinary } from "../Utlis/Clodinary.js";
+import { uploadOnCloudinary } from "../Utlis/Clodinary.js";
 import prisma from "../DB/DataBase.js";
 
 const createTweet = asyncHandler(async (req, res) => {
   const { title, description, tags } = req.body;
+
   const userId = req.user?.id;
 
   if (!title || !description || !tags) {
     throw new ApiError(400, "All fields are required.");
   }
-  const user = await Prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: {
       id: userId,
     },
   });
+
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
@@ -32,11 +34,12 @@ const createTweet = asyncHandler(async (req, res) => {
     data: {
       title,
       description,
-      tags,
+      tags :[tags],
       media: mediaUrl,
       ownerId: userId,
     },
   });
+
   return res
     .status(200)
     .json(new ApiResponse(200, question, "Tweet Created Succesfully"));
@@ -44,9 +47,13 @@ const createTweet = asyncHandler(async (req, res) => {
 
 const getAllTweet = asyncHandler(async (req, res) => {
   try {
-    const questions = await prisma.question.findMany();
+    const questions = await prisma.question.findMany({
+      include: {
+        owner: true,
+      },
+    });
     if (!questions) {
-      throw new ApiError(400, {}, "All Product not found");
+      throw new ApiError(400, {}, "All Tweet not found");
     }
     return res
       .status(200)
@@ -83,11 +90,14 @@ const getTweetByUser = asyncHandler(async (req, res) => {
 });
 
 const getTweetbyId = asyncHandler(async (req, res) => {
-  const { questionId } = req.params;
+  const questionId = parseInt(req.params.questionId, 10);
 
   const question = await prisma.question.findUnique({
     where: {
       id: questionId,
+    },
+    include: {
+      answers: true,
     },
   });
   if (!question) {
@@ -99,8 +109,11 @@ const getTweetbyId = asyncHandler(async (req, res) => {
 });
 
 const UpdateTweet = asyncHandler(async (req, res) => {
-  const { questionId } = req.params;
-
+  const questionId = parseInt(req.params.questionId, 10);
+  const { title, description } = req.body;
+  if (!(title || description)) {
+    throw new ApiError(400, "title or description is req");
+  }
   const question = await prisma.question.findUnique({
     where: {
       id: questionId,
@@ -113,7 +126,7 @@ const UpdateTweet = asyncHandler(async (req, res) => {
   const updateFields = {};
   if (title) updateFields.title = title;
   if (description) updateFields.description = description;
-  if (tags) updateFields.tags = tags;
+
 
   const updatedquestion = await prisma.question.update({
     where: {
@@ -133,7 +146,7 @@ const UpdateTweet = asyncHandler(async (req, res) => {
 });
 
 const deleteTweet = asyncHandler(async (req, res) => {
-  const { questionId } = req.params;
+  const questionId = parseInt(req.params.questionId, 10);
   const question = await prisma.question.delete({
     where: {
       id: questionId,
@@ -147,6 +160,32 @@ const deleteTweet = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, question, "tweet Deleted successfully"));
 });
 
+const getAllTweetByTags = asyncHandler(async (req, res) => {
+  const {tag} = req.params;
+
+  if (!tag) {
+    throw new ApiError(400, "Tag is required for filtering");
+  }
+
+  const question = await prisma.question.findMany({
+    where: {
+      tags: {
+        has: tag, // Filters Tweets that have the specified tag
+      },
+    },
+    include: {
+      owner: true,
+    },
+  });
+
+  if (!question || question.length === 0) {
+    throw new ApiError(404, "No tweets found with the specified tag");
+  }
+
+  return res.status(200).json(new ApiResponse(200, question, "Tweets fetched successfully"));
+});
+
+
 export {
   createTweet,
   getAllTweet,
@@ -154,4 +193,5 @@ export {
   getTweetbyId,
   deleteTweet,
   UpdateTweet,
+  getAllTweetByTags
 };
