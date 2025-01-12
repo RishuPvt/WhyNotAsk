@@ -14,14 +14,14 @@ import { upload } from "../Middleware/Multer.middleware.js";
 const router = Router();
 
 router.route("/RegisterUser").post(upload.single("avatar"), RegisterUser);
-router.route("/loginUser").post(loginUser);
-router.route("/logoutUser").post(verifyJWT, logoutUser);
-router.route("/getCurrentUser").get(getCurrentUser);
-router.route("/getUserbyId/:userId").get(getUserbyId);
-router.route("/updateAccountDetails").put(verifyJWT, updateAccountDetails);
+router.route("/login").post(loginUser);
+router.route("/logout").post(verifyJWT, logoutUser);
+router.route("/getCurrentUser").get(verifyJWT ,getCurrentUser);
+router.route("/getUserbyId/:userId").get(verifyJWT ,getUserbyId);
+router.route("/updateAccountDetails").patch(verifyJWT, updateAccountDetails);
 router
   .route("/updateUserAvatar")
-  .put(verifyJWT, upload.single("avatar"), updateUserAvatar);
-router.route("/changeCurrentPassword").put(verifyJWT ,changeCurrentPassword);
+  .patch(verifyJWT, upload.single("avatar"), updateUserAvatar);
+router.route("/changeCurrentPassword").post(verifyJWT ,changeCurrentPassword);
 
 export default router;
