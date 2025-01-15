@@ -25,6 +25,7 @@ const createTweet = asyncHandler(async (req, res) => {
   const mediaLocalPath = req.file?.path;
   let mediaUrl = null;
 
+
   if (mediaLocalPath) {
     const media = await uploadOnCloudinary(mediaLocalPath);
     mediaUrl = media?.url || null;
@@ -34,7 +35,7 @@ const createTweet = asyncHandler(async (req, res) => {
     data: {
       title,
       description,
-      tags :[tags],
+      tags: [tags],
       media: mediaUrl,
       ownerId: userId,
     },
@@ -50,6 +51,9 @@ const getAllTweet = asyncHandler(async (req, res) => {
     const questions = await prisma.question.findMany({
       include: {
         owner: true,
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
     if (!questions) {
@@ -127,7 +131,6 @@ const UpdateTweet = asyncHandler(async (req, res) => {
   if (title) updateFields.title = title;
   if (description) updateFields.description = description;
 
-
   const updatedquestion = await prisma.question.update({
     where: {
       id: questionId,
@@ -147,21 +150,35 @@ const UpdateTweet = asyncHandler(async (req, res) => {
 
 const deleteTweet = asyncHandler(async (req, res) => {
   const questionId = parseInt(req.params.questionId, 10);
-  const question = await prisma.question.delete({
+  const userId = req.user?.id;
+  const question = await prisma.question.findUnique({
     where: {
       id: questionId,
+    },
+    select: {
+      id: true,
+      ownerId: true, 
     },
   });
   if (!question) {
     throw new ApiError(404, "tweet not found");
   }
+  if (question.ownerId !== userId) {
+    throw new ApiError(403, "You do not have permission to delete this tweet");
+  }
+  await prisma.question.delete({
+    where: {
+      id: questionId,
+    },
+  });
+
   return res
     .status(200)
     .json(new ApiResponse(200, question, "tweet Deleted successfully"));
 });
 
 const getAllTweetByTags = asyncHandler(async (req, res) => {
-  const {tag} = req.params;
+  const { tag } = req.params;
 
   if (!tag) {
     throw new ApiError(400, "Tag is required for filtering");
@@ -182,9 +199,10 @@ const getAllTweetByTags = asyncHandler(async (req, res) => {
     throw new ApiError(404, "No tweets found with the specified tag");
   }
 
-  return res.status(200).json(new ApiResponse(200, question, "Tweets fetched successfully"));
+  return res
+    .status(200)
+    .json(new ApiResponse(200, question, "Tweets fetched successfully"));
 });
-
 
 export {
   createTweet,
@@ -193,5 +211,5 @@ export {
   getTweetbyId,
   deleteTweet,
   UpdateTweet,
-  getAllTweetByTags
+  getAllTweetByTags,
 };
