@@ -87,6 +87,12 @@ const getTweetByUser = asyncHandler(async (req, res) => {
     where: {
       ownerId: userId,
     },
+    include: {
+      owner: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
   });
   return res
     .status(200)
@@ -102,6 +108,8 @@ const getTweetbyId = asyncHandler(async (req, res) => {
     },
     include: {
       answers: true,
+      owner: true,
+
     },
   });
   if (!question) {
