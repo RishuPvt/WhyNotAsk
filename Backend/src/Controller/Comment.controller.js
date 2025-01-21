@@ -87,23 +87,32 @@ const UpdateComment = asyncHandler(async (req, res) => {
 
 const DeleteComment = asyncHandler(async (req, res) => {
   const answerId = parseInt(req.params.answerId, 10);
-  const userId = req.body;
+  const userId = req.user.id;
 
   if (!userId) {
     throw new ApiError(401, "User not authenticated");
   }
 
-  const answer = await prisma.answer.delete({
+  const answer = await prisma.answer.findUnique({
     where: {
       id: answerId,
     },
   });
+
   if (!answer) {
     throw new ApiError(404, "tweet not found");
   }
+  if (userId?.toString() !== answer.ownerId.toString()) {
+    throw new ApiError(403, "You are not authorized to delete this review");
+  }
+  const deletedAnswer = await prisma.answer.delete({
+    where: {
+      id: answerId,
+    },
+  });
   return res
     .status(200)
-    .json(new ApiResponse(200, answer, "Comment Deleted successfully"));
+    .json(new ApiResponse(200, deletedAnswer, "Comment Deleted successfully"));
 });
 
 const getCommentByuser = asyncHandler(async (req, res) => {
