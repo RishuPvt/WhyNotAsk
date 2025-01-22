@@ -25,7 +25,6 @@ const createTweet = asyncHandler(async (req, res) => {
   const mediaLocalPath = req.file?.path;
   let mediaUrl = null;
 
-
   if (mediaLocalPath) {
     const media = await uploadOnCloudinary(mediaLocalPath);
     mediaUrl = media?.url || null;
@@ -109,7 +108,6 @@ const getTweetbyId = asyncHandler(async (req, res) => {
     include: {
       answers: true,
       owner: true,
-
     },
   });
   if (!question) {
@@ -122,6 +120,7 @@ const getTweetbyId = asyncHandler(async (req, res) => {
 
 const UpdateTweet = asyncHandler(async (req, res) => {
   const questionId = parseInt(req.params.questionId, 10);
+  const userId = req.user?.id;
   const { title, description } = req.body;
   if (!(title || description)) {
     throw new ApiError(400, "title or description is req");
@@ -134,7 +133,9 @@ const UpdateTweet = asyncHandler(async (req, res) => {
   if (!question) {
     throw new ApiError(404, "tweet not found");
   }
-
+  if (question.ownerId !== userId) {
+    throw new ApiError(403, "You do not have permission to delete this tweet");
+  }
   const updateFields = {};
   if (title) updateFields.title = title;
   if (description) updateFields.description = description;
@@ -165,7 +166,7 @@ const deleteTweet = asyncHandler(async (req, res) => {
     },
     select: {
       id: true,
-      ownerId: true, 
+      ownerId: true,
     },
   });
   if (!question) {
