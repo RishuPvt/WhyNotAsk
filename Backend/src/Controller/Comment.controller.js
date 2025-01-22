@@ -70,7 +70,9 @@ const UpdateComment = asyncHandler(async (req, res) => {
   if (!answer) {
     throw new ApiError(404, "Question not found");
   }
-
+  if (userId?.toString() !== answer.ownerId.toString()) {
+    throw new ApiError(403, "You are not authorized to Update this review");
+  }
   const updateFields = {};
   if (content) updateFields.content = content;
 
