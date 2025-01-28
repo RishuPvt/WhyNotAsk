@@ -185,14 +185,14 @@ const getUserbyId = asyncHandler(async (req, res) => {
   const avatarUrl = user.avatar ? user.avatar : null;
 
   return res.status(200).json(
-    new ApiResponse(200, "User fetched Successfully", {
+    new ApiResponse(200, {
       id: user.id,
       username: user.username,
       email: user.email,
       fullName: user.fullName,
       bio: user.bio,
       avatar: avatarUrl || null,
-    })
+    }, "User fetched Successfully")
   );
 });
 
