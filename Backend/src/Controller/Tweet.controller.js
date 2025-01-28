@@ -98,6 +98,37 @@ const getTweetByUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, questions, "Tweet Created Succesfully"));
 });
 
+const getAllTweetbyUser = asyncHandler(async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  console.log(userId);
+
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId,
+    },
+  });
+  console.log(user);
+
+  if (!user) {
+    throw new ApiError(404, "user not found");
+  }
+
+  const question = await prisma.question.findMany({
+    where: {
+      ownerId: userId,
+    },
+    include: {
+      owner: true,
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+  });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, question, "Tweet Fetch Succesfully"));
+});
+
 const getTweetbyId = asyncHandler(async (req, res) => {
   const questionId = parseInt(req.params.questionId, 10);
 
@@ -221,4 +252,5 @@ export {
   deleteTweet,
   UpdateTweet,
   getAllTweetByTags,
+  getAllTweetbyUser,
 };
